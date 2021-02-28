@@ -112,9 +112,9 @@ class ApiInter(object):
 
         result = self._call(
             requests.get,
-            url=_url,            
+            url=_url,
             )
-        )
+            
         return result.content and result.json() or result.ok
 
     def boleto_baixa(self, nosso_numero, codigo_baixa):
