@@ -28,6 +28,8 @@ class ApiInter(object):
 
     _api = 'https://apis.bancointer.com.br:8443/openbanking/v1/certificado/boletos'
 
+    #_api = 'https://apis.bancointer.com.br/openbanking/v1/certificado/boletos'
+
     def __init__(self, cert, conta_corrente):
         self._cert = cert
         self.conta_corrente = conta_corrente
@@ -35,26 +37,31 @@ class ApiInter(object):
     def _prepare_headers(self):
         return {
             'content-type': 'application/json',
-            'x-inter-conta-corrente': self.conta_corrente,
+            'x-inter-conta-corrente': self.conta_corrente
         }
 
     def _call(self, http_request, url, params=None, data=None, **kwargs):
+        debug1 = self._prepare_headers()
+        debug2 = json.dumps(data or {})
+        #debug3 = self._cert.name
         response = http_request(
             url,
             headers=self._prepare_headers(),
             params=params or {},
             data=json.dumps(data or {}),
             cert=self._cert,
-            verify=False,
+            verify=True,
             **kwargs
         )
         if response.status_code > 299:
-            error = response.json()
-            message = '%s - Código %s' % (
-                response.status_code,
-                error.get('error-code')
-            )
-            raise Exception(message)
+            #error = response.json()
+            error = response#.json()
+            #message = '%s - Código %s' % (
+            #    response.status_code,
+            #    error.get('error-code')
+            #)
+            #raise Exception(message)
+            raise Exception([str(response.text), response.status_code, debug1, debug2 ])
         return response
 
     def boleto_inclui(self, boleto):
@@ -71,8 +78,8 @@ class ApiInter(object):
         )
         return result.content and result.json() or result.ok
 
-    def boleto_consulta(self, filtrar_por='TODOS', data_inicial=None, data_final=None,
-                        ordenar_por='NOSSONUMERO'):
+    def boleto_consulta(self, filtrar_por='TODOS', data_inicial=None, data_final=None,ordenar_por='NOSSONUMERO'):
+
         """ GET
         https://apis.bancointer.com.br:8443/openbanking/v1/certificado/boletos?
             filtrarPor=TODOS&
