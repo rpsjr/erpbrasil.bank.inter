@@ -43,7 +43,7 @@ class ApiInter(object):
     def _call(self, http_request, url, params=None, data=None, **kwargs):
         debug1 = self._prepare_headers()
         debug2 = json.dumps(data or {})
-        #debug3 = self._cert.name
+        debug3 = params or {}
         response = http_request(
             url,
             headers=self._prepare_headers(),
@@ -61,7 +61,7 @@ class ApiInter(object):
             #    error.get('error-code')
             #)
             #raise Exception(message)
-            raise Exception([str(response.text), response.status_code, debug1, debug2 ])
+            raise Exception([str(response.text), response.status_code, debug1, debug2, debug3 ])
         return response
 
     def boleto_inclui(self, boleto):
@@ -78,7 +78,7 @@ class ApiInter(object):
         )
         return result.content and result.json() or result.ok
 
-    def boleto_consulta(self, filtrar_por='TODOS', data_inicial=None, data_final=None,ordenar_por='NOSSONUMERO'):
+    def boleto_consulta(self, filtrar_por='TODOS', data_inicial=None, data_final=None,ordenar_por='NOSSONUMERO', page=0):
 
         """ GET
         https://apis.bancointer.com.br:8443/openbanking/v1/certificado/boletos?
@@ -100,7 +100,19 @@ class ApiInter(object):
                 filtrarPor=filtrar_por,
                 dataInicial=data_inicial,
                 dataFinal=data_final,
-                ordenarPor=ordenar_por
+                ordenarPor=ordenar_por,
+                page=page
+            )
+        )
+        return result.content and result.json() or result.ok
+
+    def boleto_recupera(self, nosso_numero):
+
+        _url = f'{self._api}/{nosso_numero}'
+
+        result = self._call(
+            requests.get,
+            url=_url,            
             )
         )
         return result.content and result.json() or result.ok
