@@ -69,18 +69,21 @@ class BoletoInter:
         )
         data = dict(
             pagador=pagador,
-            dataEmissao=self._issue_date,
             seuNumero=self._identifier,
-            dataLimite="SESSENTA",
+            dataEmissao=self._issue_date,
             dataVencimento=self._due_date,
+            valorNominal=self._amount,
+            valorAbatimento=0,
+            
+            # dataLimite="SESSENTA", # Não existe mais na V3
+            # cnpjCPFBeneficiario=self._sender.identifier, # Não existe mais na V3
+
+            multa=self.multa,
+            mora=self.mora,
             desconto1=self.discount1,
             desconto2=self.discount2,
             desconto3=self.discount3,
-            valorNominal=self._amount,
-            valorAbatimento=0,
-            multa=self.multa,
-            mora=self.mora,
-            cnpjCPFBeneficiario=self._sender.identifier,
+            
             numDiasAgenda="60",
         )
 

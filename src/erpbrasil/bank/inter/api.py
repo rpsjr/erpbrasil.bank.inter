@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
-
+import logging
 import requests
 
 from .auth import Auth
@@ -25,12 +25,15 @@ ORDENAR_CONSULTA_POR = [
     "STATUS_DSC",
 ]
 
+_logger = logging.getLogger(__name__)
+
 
 class ApiInter(object):
     """Implementa a Api do Inter"""
 
     # _api = 'https://apis.bancointer.com.br:8443/openbanking/v1/certificado/boletos'
-    _api = "https://cdpj.partners.bancointer.com.br/cobranca/v2/boletos/"
+    # _api = "https://cdpj.partners.bancointer.com.br/cobranca/v2/boletos/"
+    _api = "https://cdpj.partners.bancointer.com.br/cobranca/v3/cobrancas"
 
     def __init__(self, cert, conta_corrente, clientId, clientSecret):
         self._cert = cert
@@ -72,6 +75,9 @@ class ApiInter(object):
             #    error.get('error-code')
             # )
             # raise Exception(message)
+            _logger.error("DEBUG HEADER: {}".format(debug1))
+            _logger.error("DEBUG DATA: {}".format(debug2))
+            _logger.error("DEBUG PARAMS: {}".format(debug3))
             raise Exception(
                 [str(response.text), response.status_code, debug1, debug2, debug3]
             )
@@ -90,29 +96,48 @@ class ApiInter(object):
 
     def boleto_consulta(
         self,
-        filtrar_por="TODOS",
         data_inicial=None,
         data_final=None,
+        filtrar_data_por="VENCIMENTO",
+        situacao=None,
+        nome=None,
+        email=None,
+        cpf_cnpj=None,
+        nosso_numero=None,
         ordenar_por="NOSSONUMERO",
         page=0,
+        page_size=100
     ):
+        params = dict(
+            dataInicial=data_inicial,
+            dataFinal=data_final,
+            filtrarDataPor=filtrar_data_por,
+            ordenarPor=ordenar_por,
+            pagina=page,
+            tamanhoPagina=page_size
+        )
+        if situacao:
+            params['situacao'] = situacao
+        if nome:
+            params['nome'] = nome
+        if email:
+            params['email'] = email
+        if cpf_cnpj:
+            params['cpfCnpj'] = cpf_cnpj
+        if nosso_numero:
+            params['nossoNumero'] = nosso_numero
+
         result = self._call(
             self.auth.token_boleto_read,
             requests.get,
             url=self._api,
-            params=dict(
-                filtrarPor=filtrar_por,
-                dataInicial=data_inicial,
-                dataFinal=data_final,
-                ordenarPor=ordenar_por,
-                page=page,
-            ),
+            params=params,
         )
         return result.content and result.json() or result.ok
 
-    def boleto_recupera(self, nosso_numero):
+    def boleto_recupera(self, codigo_solicitacao):
 
-        _url = f"{self._api}{nosso_numero}"
+        _url = f"{self._api}/{codigo_solicitacao}"
 
         result = self._call(
             self.auth.token_boleto_read,
@@ -122,15 +147,15 @@ class ApiInter(object):
 
         return result.content and result.json() or result.ok
 
-    def boleto_baixa(self, nossoNumero, motivoCancelamento):
+    def boleto_baixa(self, codigo_solicitacao, motivoCancelamento):
         """POST
-        https://cdpj.partners.bancointer.com.br/cobranca/v2/boletos/{nossoNumero}/cancelar
+        https://cdpj.partners.bancointer.com.br/cobranca/v3/cobrancas/{codigoSolicitacao}/cancelar
 
 
-        :param nosso_numero:
+        :param codigo_solicitacao:
         :return:
         """
-        url = "{}{}/cancelar".format(self._api, nossoNumero)
+        url = "{}/{}/cancelar".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_write,
             requests.post,
@@ -141,15 +166,15 @@ class ApiInter(object):
         )
         return result.content and result.json() or result.ok
 
-    def boleto_pdf(self, nosso_numero):
+    def boleto_pdf(self, codigo_solicitacao):
         """GET
-        https://cdpj.partners.bancointer.com.br/cobranca/v2/boletos/
-            00595764723/pdf
+        https://cdpj.partners.bancointer.com.br/cobranca/v3/cobrancas/
+            {codigoSolicitacao}/pdf
 
-        :param nosso_numero:
+        :param codigo_solicitacao:
         :return:
         """
-        url = "{}{}/pdf".format(self._api, nosso_numero)
+        url = "{}/{}/pdf".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_read,
             requests.get,
