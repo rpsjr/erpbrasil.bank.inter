@@ -2,6 +2,7 @@
 import json
 import logging
 import requests
+import re
 
 from .auth import Auth
 
@@ -89,10 +90,35 @@ class ApiInter(object):
         :param boleto:
         :return:
         """
-        result = self._call(
-            self.auth.token_boleto_write, requests.post, url=self._api, data=boleto
-        )
-        return result.content and result.json() or result.ok
+        try:
+            result = self._call(
+                self.auth.token_boleto_write, requests.post, url=self._api, data=boleto
+            )
+            data = result.content and result.json() or {}
+        except Exception as e:
+            data = None
+            if isinstance(e.args[0], list) and len(e.args[0]) > 0:
+                try:
+                    error_json = json.loads(e.args[0][0])
+                    detail = error_json.get("detail", "")
+                    # Regex to extract UUID: código de solicitação: uuid.
+                    match = re.search(r"código de solicitação:\s*([a-f0-9\-]+)", detail)
+                    if match:
+                        data = {"codigoSolicitacao": match.group(1)}
+                except:
+                    pass
+            if not data:
+                raise e
+
+        if isinstance(data, dict) and data.get("codigoSolicitacao"):
+            detail = self.boleto_recupera(data["codigoSolicitacao"])
+            if isinstance(detail, dict):
+                # Flatten the response for compatibility
+                if "boleto" in detail:
+                    data.update(detail["boleto"])
+                if "cobranca" in detail:
+                    data.update(detail["cobranca"])
+        return data or (result.ok if 'result' in locals() else False)
 
     def boleto_consulta(
         self,
