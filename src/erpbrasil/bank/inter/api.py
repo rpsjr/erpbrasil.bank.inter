@@ -214,44 +214,65 @@ class ApiInter(object):
              def has_cobrancas(resp):
                  return resp and isinstance(resp, dict) and "cobrancas" in resp and len(resp["cobrancas"]) > 0
 
-             # Try finding by nossoNumero (VENCIMENTO)
-             cobrancas = self.boleto_consulta(
-                 data_inicial=dt_ini,
-                 data_final=dt_fin,
-                 nosso_numero=codigo_solicitacao,
-                 filtrar_data_por="VENCIMENTO"
-             )
-             
-             # Try finding by nossoNumero (EMISSAO)
-             if not has_cobrancas(cobrancas):
+             # Prepare candidates for search (padding, unpadding)
+             candidates = [str(codigo_solicitacao)]
+             if str(codigo_solicitacao).isdigit():
+                 candidates.append(str(codigo_solicitacao).zfill(11))
+                 candidates.append(str(int(codigo_solicitacao)))
+             candidates = list(set(candidates))
+
+             found = False
+             for cand in candidates:
+                 # Try finding by nossoNumero (VENCIMENTO)
                  cobrancas = self.boleto_consulta(
                      data_inicial=dt_ini,
                      data_final=dt_fin,
-                     nosso_numero=codigo_solicitacao,
-                     filtrar_data_por="EMISSAO"
-                 )
-            
-             # Try finding by seuNumero (VENCIMENTO)
-             if not has_cobrancas(cobrancas):
-                 cobrancas = self.boleto_consulta(
-                     data_inicial=dt_ini,
-                     data_final=dt_fin,
-                     seu_numero=codigo_solicitacao,
+                     nosso_numero=cand,
                      filtrar_data_por="VENCIMENTO"
                  )
-
-             # Try finding by seuNumero (EMISSAO)
-             if not has_cobrancas(cobrancas):
+                 if has_cobrancas(cobrancas):
+                      codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+                      found = True
+                      break
+                 
+                 # Try finding by nossoNumero (EMISSAO)
                  cobrancas = self.boleto_consulta(
                      data_inicial=dt_ini,
                      data_final=dt_fin,
-                     seu_numero=codigo_solicitacao,
+                     nosso_numero=cand,
                      filtrar_data_por="EMISSAO"
                  )
+                 if has_cobrancas(cobrancas):
+                      codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+                      found = True
+                      break
 
-             if has_cobrancas(cobrancas):
-                 codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+             if not found:
+                 for cand in candidates:
+                     # Try finding by seuNumero (VENCIMENTO)
+                     cobrancas = self.boleto_consulta(
+                         data_inicial=dt_ini,
+                         data_final=dt_fin,
+                         seu_numero=cand,
+                         filtrar_data_por="VENCIMENTO"
+                     )
+                     if has_cobrancas(cobrancas):
+                          codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+                          found = True
+                          break
 
+                     # Try finding by seuNumero (EMISSAO)
+                     cobrancas = self.boleto_consulta(
+                         data_inicial=dt_ini,
+                         data_final=dt_fin,
+                         seu_numero=cand,
+                         filtrar_data_por="EMISSAO"
+                     )
+                     if has_cobrancas(cobrancas):
+                          codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+                          found = True
+                          break
+             
         url = "{}/{}/pdf".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_read,
