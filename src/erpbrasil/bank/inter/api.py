@@ -85,6 +85,60 @@ class ApiInter(object):
             )
         return response
 
+    def _find_uuid_from_code(self, code):
+        """Helper to find UUID if code is nossoNumero or seuNumero"""
+        if re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(code)):
+            return str(code)
+
+        today = datetime.now()
+        dt_ini = (today - timedelta(days=365*5)).strftime("%Y-%m-%d")
+        dt_fin = (today + timedelta(days=365*2)).strftime("%Y-%m-%d")
+        
+        def has_cobrancas(resp):
+             return resp and isinstance(resp, dict) and "cobrancas" in resp and len(resp["cobrancas"]) > 0
+
+        candidates = [str(code)]
+        if str(code).isdigit():
+             candidates.append(str(code).zfill(11))
+             candidates.append(str(int(code)))
+        candidates = list(set(candidates))
+
+        for cand in candidates:
+             # Try finding by nossoNumero (VENCIMENTO)
+             cobrancas = self.boleto_consulta(
+                 data_inicial=dt_ini, data_final=dt_fin,
+                 nosso_numero=cand, filtrar_data_por="VENCIMENTO"
+             )
+             if has_cobrancas(cobrancas):
+                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+             
+             # Try finding by nossoNumero (EMISSAO)
+             cobrancas = self.boleto_consulta(
+                 data_inicial=dt_ini, data_final=dt_fin,
+                 nosso_numero=cand, filtrar_data_por="EMISSAO"
+             )
+             if has_cobrancas(cobrancas):
+                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+
+        for cand in candidates:
+             # Try finding by seuNumero (VENCIMENTO)
+             cobrancas = self.boleto_consulta(
+                 data_inicial=dt_ini, data_final=dt_fin,
+                 seu_numero=cand, filtrar_data_por="VENCIMENTO"
+             )
+             if has_cobrancas(cobrancas):
+                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+
+             # Try finding by seuNumero (EMISSAO)
+             cobrancas = self.boleto_consulta(
+                 data_inicial=dt_ini, data_final=dt_fin,
+                 seu_numero=cand, filtrar_data_por="EMISSAO"
+             )
+             if has_cobrancas(cobrancas):
+                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+        
+        return str(code)
+
     def boleto_inclui(self, boleto):
         """POST
 
@@ -185,6 +239,7 @@ class ApiInter(object):
         :param codigo_solicitacao:
         :return:
         """
+        codigo_solicitacao = self._find_uuid_from_code(codigo_solicitacao)
         url = "{}/{}/cancelar".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_write,
@@ -204,75 +259,8 @@ class ApiInter(object):
         :param codigo_solicitacao:
         :return:
         """
-        # If it's not a UUID, assume it's nossoNumero and try to find the UUID
-        if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(codigo_solicitacao)):
-             today = datetime.now()
-             dt_ini = (today - timedelta(days=365*5)).strftime("%Y-%m-%d")
-             dt_fin = (today + timedelta(days=365*2)).strftime("%Y-%m-%d")
-             
-             # Helper to check if response has cobrancas
-             def has_cobrancas(resp):
-                 return resp and isinstance(resp, dict) and "cobrancas" in resp and len(resp["cobrancas"]) > 0
-
-             # Prepare candidates for search (padding, unpadding)
-             candidates = [str(codigo_solicitacao)]
-             if str(codigo_solicitacao).isdigit():
-                 candidates.append(str(codigo_solicitacao).zfill(11))
-                 candidates.append(str(int(codigo_solicitacao)))
-             candidates = list(set(candidates))
-
-             found = False
-             for cand in candidates:
-                 # Try finding by nossoNumero (VENCIMENTO)
-                 cobrancas = self.boleto_consulta(
-                     data_inicial=dt_ini,
-                     data_final=dt_fin,
-                     nosso_numero=cand,
-                     filtrar_data_por="VENCIMENTO"
-                 )
-                 if has_cobrancas(cobrancas):
-                      codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
-                      found = True
-                      break
-                 
-                 # Try finding by nossoNumero (EMISSAO)
-                 cobrancas = self.boleto_consulta(
-                     data_inicial=dt_ini,
-                     data_final=dt_fin,
-                     nosso_numero=cand,
-                     filtrar_data_por="EMISSAO"
-                 )
-                 if has_cobrancas(cobrancas):
-                      codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
-                      found = True
-                      break
-
-             if not found:
-                 for cand in candidates:
-                     # Try finding by seuNumero (VENCIMENTO)
-                     cobrancas = self.boleto_consulta(
-                         data_inicial=dt_ini,
-                         data_final=dt_fin,
-                         seu_numero=cand,
-                         filtrar_data_por="VENCIMENTO"
-                     )
-                     if has_cobrancas(cobrancas):
-                          codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
-                          found = True
-                          break
-
-                     # Try finding by seuNumero (EMISSAO)
-                     cobrancas = self.boleto_consulta(
-                         data_inicial=dt_ini,
-                         data_final=dt_fin,
-                         seu_numero=cand,
-                         filtrar_data_por="EMISSAO"
-                     )
-                     if has_cobrancas(cobrancas):
-                          codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
-                          found = True
-                          break
-             
+        codigo_solicitacao = self._find_uuid_from_code(codigo_solicitacao)
+        
         url = "{}/{}/pdf".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_read,
