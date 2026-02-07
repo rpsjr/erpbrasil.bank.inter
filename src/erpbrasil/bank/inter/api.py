@@ -131,6 +131,7 @@ class ApiInter(object):
         email=None,
         cpf_cnpj=None,
         nosso_numero=None,
+        seu_numero=None,
         ordenar_por="NOSSONUMERO",
         page=0,
         page_size=100
@@ -153,6 +154,8 @@ class ApiInter(object):
             params['cpfCnpj'] = cpf_cnpj
         if nosso_numero:
             params['nossoNumero'] = nosso_numero
+        if seu_numero:
+            params['seuNumero'] = seu_numero
 
         result = self._call(
             self.auth.token_boleto_read,
@@ -204,17 +207,49 @@ class ApiInter(object):
         # If it's not a UUID, assume it's nossoNumero and try to find the UUID
         if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(codigo_solicitacao)):
              today = datetime.now()
-             # Wide range search
              dt_ini = (today - timedelta(days=365*5)).strftime("%Y-%m-%d")
              dt_fin = (today + timedelta(days=365*2)).strftime("%Y-%m-%d")
              
+             # Helper to check if response has cobrancas
+             def has_cobrancas(resp):
+                 return resp and isinstance(resp, dict) and "cobrancas" in resp and len(resp["cobrancas"]) > 0
+
+             # Try finding by nossoNumero (VENCIMENTO)
              cobrancas = self.boleto_consulta(
                  data_inicial=dt_ini,
                  data_final=dt_fin,
-                 nosso_numero=codigo_solicitacao
+                 nosso_numero=codigo_solicitacao,
+                 filtrar_data_por="VENCIMENTO"
              )
              
-             if cobrancas and isinstance(cobrancas, dict) and "cobrancas" in cobrancas and len(cobrancas["cobrancas"]) > 0:
+             # Try finding by nossoNumero (EMISSAO)
+             if not has_cobrancas(cobrancas):
+                 cobrancas = self.boleto_consulta(
+                     data_inicial=dt_ini,
+                     data_final=dt_fin,
+                     nosso_numero=codigo_solicitacao,
+                     filtrar_data_por="EMISSAO"
+                 )
+            
+             # Try finding by seuNumero (VENCIMENTO)
+             if not has_cobrancas(cobrancas):
+                 cobrancas = self.boleto_consulta(
+                     data_inicial=dt_ini,
+                     data_final=dt_fin,
+                     seu_numero=codigo_solicitacao,
+                     filtrar_data_por="VENCIMENTO"
+                 )
+
+             # Try finding by seuNumero (EMISSAO)
+             if not has_cobrancas(cobrancas):
+                 cobrancas = self.boleto_consulta(
+                     data_inicial=dt_ini,
+                     data_final=dt_fin,
+                     seu_numero=codigo_solicitacao,
+                     filtrar_data_por="EMISSAO"
+                 )
+
+             if has_cobrancas(cobrancas):
                  codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
 
         url = "{}/{}/pdf".format(self._api, codigo_solicitacao)
