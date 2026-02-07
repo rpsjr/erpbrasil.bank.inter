@@ -70,9 +70,9 @@ class BoletoInter:
 
         def clean_discount(d):
             if not d or d.get("codigoDesconto") == "NAOTEMDESCONTO":
-                return dict(codigoDesconto="NAOTEMDESCONTO")
+                return dict(codigo="NAOTEMDESCONTO")
             
-            res = {"codigoDesconto": d["codigoDesconto"]}
+            res = {"codigo": d["codigoDesconto"]}
             
             # Data is optional but if present must be valid
             if d.get("data"): 
@@ -93,9 +93,9 @@ class BoletoInter:
 
         def clean_fine(d):
              if not d or d.get("codigoMulta") == "NAOTEMMULTA":
-                 return dict(codigoMulta="NAOTEMMULTA")
+                 return dict(codigo="NAOTEMMULTA")
              
-             res = {"codigoMulta": d["codigoMulta"]}
+             res = {"codigo": d["codigoMulta"]}
              if d.get("data"): 
                  res["data"] = d["data"]
                  
@@ -103,13 +103,18 @@ class BoletoInter:
                  res["taxa"] = d.get("taxa", 0)
              elif d["codigoMulta"] == "VALORFIXO":
                  res["valor"] = d.get("valor", 0)
+
+             if "taxa" not in res and d.get("taxa"):
+                 res["taxa"] = d["taxa"]
+             if "valor" not in res and d.get("valor"):
+                 res["valor"] = d["valor"]
              return res
 
         def clean_mora(d):
              if not d or d.get("codigoMora") == "ISENTO":
-                 return dict(codigoMora="ISENTO")
+                 return dict(codigo="ISENTO")
              
-             res = {"codigoMora": d["codigoMora"]}
+             res = {"codigo": d["codigoMora"]}
              if d.get("data"): 
                  res["data"] = d["data"]
                  
@@ -117,6 +122,11 @@ class BoletoInter:
                  res["taxa"] = d.get("taxa", 0)
              elif d["codigoMora"] == "VALORDIA":
                  res["valor"] = d.get("valor", 0)
+
+             if "taxa" not in res and d.get("taxa"):
+                 res["taxa"] = d["taxa"]
+             if "valor" not in res and d.get("valor"):
+                 res["valor"] = d["valor"]
              return res
 
         data = dict(
