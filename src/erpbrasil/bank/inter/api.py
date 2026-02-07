@@ -93,16 +93,39 @@ class ApiInter(object):
         dt_ini = (today - timedelta(days=365*5)).strftime("%Y-%m-%d")
         dt_fin = (today + timedelta(days=365*2)).strftime("%Y-%m-%d")
         
-        def has_cobrancas(resp):
-             return resp and isinstance(resp, dict) and "cobrancas" in resp and len(resp["cobrancas"]) > 0
+        target = str(code).lstrip('0')
 
+        def find_in_list(cobrancas):
+            if cobrancas and isinstance(cobrancas, dict) and "cobrancas" in cobrancas:
+                for item in cobrancas["cobrancas"]:
+                    # Helper to get uuid from item
+                    uuid = item.get("cobranca", {}).get("codigoSolicitacao") or item.get("codigoSolicitacao")
+                    if not uuid: continue
+                    
+                    # Check boleto.nossoNumero
+                    nn = item.get("boleto", {}).get("nossoNumero", "")
+                    if str(nn).lstrip('0') == target:
+                        return uuid
+                    
+                    # Check cobranca.seuNumero
+                    sn = item.get("cobranca", {}).get("seuNumero", "")
+                    if str(sn).lstrip('0') == target:
+                        return uuid
+                    
+                    # Fallback checks
+                    if str(item.get("nossoNumero", "")).lstrip('0') == target:
+                        return uuid
+                    if str(item.get("seuNumero", "")).lstrip('0') == target:
+                        return uuid
+            return None
+
+        # Strategy 1: Try searching by nossoNumero/seuNumero with variations
         candidates = [str(code)]
         if str(code).isdigit():
              candidates.append(str(code).zfill(11))
              candidates.append(str(int(code)))
         candidates = list(set(candidates))
 
-        # Try searching with different sorting to maximize chance if filter is ignored
         sort_opts = ["CODIGO_COBRANCA", "DATA_EMISSAO"] 
 
         for cand in candidates:
@@ -113,8 +136,8 @@ class ApiInter(object):
                      nosso_numero=cand, filtrar_data_por="VENCIMENTO",
                      ordenar_por=sort_by, type_ordenacao="DESC"
                  )
-                 if has_cobrancas(cobrancas):
-                      return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+                 uuid = find_in_list(cobrancas)
+                 if uuid: return uuid
                  
                  # Try finding by nossoNumero (EMISSAO)
                  cobrancas = self.boleto_consulta(
@@ -122,8 +145,8 @@ class ApiInter(object):
                      nosso_numero=cand, filtrar_data_por="EMISSAO",
                      ordenar_por=sort_by, type_ordenacao="DESC"
                  )
-                 if has_cobrancas(cobrancas):
-                      return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+                 uuid = find_in_list(cobrancas)
+                 if uuid: return uuid
 
         for cand in candidates:
              # Try finding by seuNumero (VENCIMENTO)
@@ -132,8 +155,8 @@ class ApiInter(object):
                  seu_numero=cand, filtrar_data_por="VENCIMENTO",
                  ordenar_por="CODIGO_COBRANCA", type_ordenacao="DESC"
              )
-             if has_cobrancas(cobrancas):
-                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+             uuid = find_in_list(cobrancas)
+             if uuid: return uuid
 
              # Try finding by seuNumero (EMISSAO)
              cobrancas = self.boleto_consulta(
@@ -141,8 +164,19 @@ class ApiInter(object):
                  seu_numero=cand, filtrar_data_por="EMISSAO",
                  ordenar_por="CODIGO_COBRANCA", type_ordenacao="DESC"
              )
-             if has_cobrancas(cobrancas):
-                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+             uuid = find_in_list(cobrancas)
+             if uuid: return uuid
+
+        # Strategy 2: Generic search (if filters are broken/ignored)
+        # Fetch recent 100 items by EMISSAO DESC
+        cobrancas = self.boleto_consulta(
+             data_inicial=dt_ini, data_final=dt_fin,
+             filtrar_data_por="EMISSAO",
+             ordenar_por="CODIGO_COBRANCA", type_ordenacao="DESC",
+             page_size=100
+        )
+        uuid = find_in_list(cobrancas)
+        if uuid: return uuid
         
         return str(code)
 
