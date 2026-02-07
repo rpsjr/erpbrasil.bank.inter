@@ -3,6 +3,7 @@ import json
 import logging
 import requests
 import re
+from datetime import datetime, timedelta
 
 from .auth import Auth
 
@@ -200,6 +201,22 @@ class ApiInter(object):
         :param codigo_solicitacao:
         :return:
         """
+        # If it's not a UUID, assume it's nossoNumero and try to find the UUID
+        if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(codigo_solicitacao)):
+             today = datetime.now()
+             # Wide range search
+             dt_ini = (today - timedelta(days=365*5)).strftime("%Y-%m-%d")
+             dt_fin = (today + timedelta(days=365*2)).strftime("%Y-%m-%d")
+             
+             cobrancas = self.boleto_consulta(
+                 data_inicial=dt_ini,
+                 data_final=dt_fin,
+                 nosso_numero=codigo_solicitacao
+             )
+             
+             if cobrancas and isinstance(cobrancas, dict) and "cobrancas" in cobrancas and len(cobrancas["cobrancas"]) > 0:
+                 codigo_solicitacao = cobrancas["cobrancas"][0].get("codigoSolicitacao", codigo_solicitacao)
+
         url = "{}/{}/pdf".format(self._api, codigo_solicitacao)
         result = self._call(
             self.auth.token_boleto_read,
