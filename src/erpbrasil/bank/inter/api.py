@@ -16,15 +16,14 @@ FILTRAR_POR = [
 ]
 
 ORDENAR_CONSULTA_POR = [
-    "NOSSONUMERO",  # (Default)
-    "SEUNUMERO",
-    "DATAVENCIMENTO_ASC",
-    "DATAVENCIMENTO_DSC",
-    "NOMESACADO",
-    "VALOR_ASC",
-    "VALOR_DSC",
-    "STATUS_ASC",
-    "STATUS_DSC",
+    "PESSOA_PAGADORA",
+    "TIPO_COBRANCA",
+    "CODIGO_COBRANCA",
+    "IDENTIFICADOR",
+    "DATA_EMISSAO",
+    "DATA_VENCIMENTO",
+    "VALOR",
+    "STATUS"
 ]
 
 _logger = logging.getLogger(__name__)
@@ -103,28 +102,35 @@ class ApiInter(object):
              candidates.append(str(int(code)))
         candidates = list(set(candidates))
 
+        # Try searching with different sorting to maximize chance if filter is ignored
+        sort_opts = ["CODIGO_COBRANCA", "DATA_EMISSAO"] 
+
         for cand in candidates:
-             # Try finding by nossoNumero (VENCIMENTO)
-             cobrancas = self.boleto_consulta(
-                 data_inicial=dt_ini, data_final=dt_fin,
-                 nosso_numero=cand, filtrar_data_por="VENCIMENTO"
-             )
-             if has_cobrancas(cobrancas):
-                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
-             
-             # Try finding by nossoNumero (EMISSAO)
-             cobrancas = self.boleto_consulta(
-                 data_inicial=dt_ini, data_final=dt_fin,
-                 nosso_numero=cand, filtrar_data_por="EMISSAO"
-             )
-             if has_cobrancas(cobrancas):
-                  return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+             for sort_by in sort_opts:
+                 # Try finding by nossoNumero (VENCIMENTO)
+                 cobrancas = self.boleto_consulta(
+                     data_inicial=dt_ini, data_final=dt_fin,
+                     nosso_numero=cand, filtrar_data_por="VENCIMENTO",
+                     ordenar_por=sort_by, type_ordenacao="DESC"
+                 )
+                 if has_cobrancas(cobrancas):
+                      return cobrancas["cobrancas"][0].get("codigoSolicitacao")
+                 
+                 # Try finding by nossoNumero (EMISSAO)
+                 cobrancas = self.boleto_consulta(
+                     data_inicial=dt_ini, data_final=dt_fin,
+                     nosso_numero=cand, filtrar_data_por="EMISSAO",
+                     ordenar_por=sort_by, type_ordenacao="DESC"
+                 )
+                 if has_cobrancas(cobrancas):
+                      return cobrancas["cobrancas"][0].get("codigoSolicitacao")
 
         for cand in candidates:
              # Try finding by seuNumero (VENCIMENTO)
              cobrancas = self.boleto_consulta(
                  data_inicial=dt_ini, data_final=dt_fin,
-                 seu_numero=cand, filtrar_data_por="VENCIMENTO"
+                 seu_numero=cand, filtrar_data_por="VENCIMENTO",
+                 ordenar_por="CODIGO_COBRANCA", type_ordenacao="DESC"
              )
              if has_cobrancas(cobrancas):
                   return cobrancas["cobrancas"][0].get("codigoSolicitacao")
@@ -132,7 +138,8 @@ class ApiInter(object):
              # Try finding by seuNumero (EMISSAO)
              cobrancas = self.boleto_consulta(
                  data_inicial=dt_ini, data_final=dt_fin,
-                 seu_numero=cand, filtrar_data_por="EMISSAO"
+                 seu_numero=cand, filtrar_data_por="EMISSAO",
+                 ordenar_por="CODIGO_COBRANCA", type_ordenacao="DESC"
              )
              if has_cobrancas(cobrancas):
                   return cobrancas["cobrancas"][0].get("codigoSolicitacao")
@@ -186,7 +193,8 @@ class ApiInter(object):
         cpf_cnpj=None,
         nosso_numero=None,
         seu_numero=None,
-        ordenar_por="NOSSONUMERO",
+        ordenar_por="CODIGO_COBRANCA",
+        type_ordenacao="ASC",
         page=0,
         page_size=100
     ):
@@ -195,6 +203,7 @@ class ApiInter(object):
             dataFinal=data_final,
             filtrarDataPor=filtrar_data_por,
             ordenarPor=ordenar_por,
+            tipoOrdenacao=type_ordenacao,
             pagina=page,
             tamanhoPagina=page_size
         )
