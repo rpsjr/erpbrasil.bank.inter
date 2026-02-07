@@ -147,11 +147,11 @@ class ApiInter(object):
         if situacao:
             params['situacao'] = situacao
         if nome:
-            params['nome'] = nome
+            params['pessoaPagadora'] = nome
         if email:
             params['email'] = email
         if cpf_cnpj:
-            params['cpfCnpj'] = cpf_cnpj
+            params['cpfCnpjPessoaPagadora'] = cpf_cnpj
         if nosso_numero:
             params['nossoNumero'] = nosso_numero
         if seu_numero:
