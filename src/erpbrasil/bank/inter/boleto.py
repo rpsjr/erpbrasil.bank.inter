@@ -119,17 +119,17 @@ class BoletoInter:
 
         def clean_mora(d):
             if not d:
-                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+                return None
             code = d.get("codigoMora") or d.get("codigo") or "ISENTO"
-            if code == "ISENTO":
-                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+            if code in ("ISENTO", "NAO_TEM_MORA", "NAOTEMMORA"):
+                return None
             
             taxa = float(d.get("taxa") or 0.0)
             valor = float(d.get("valor") or 0.0)
             if code == "TAXAMENSAL" and taxa <= 0:
-                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+                return None
             if code == "VALORDIA" and valor <= 0:
-                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+                return None
 
             res = {"codigo": code}
             if d.get("data"): 
@@ -151,13 +151,16 @@ class BoletoInter:
             valorNominal=self._amount,
             valorAbatimento=0,
             
-            mora=clean_mora(self.mora),
             desconto1=clean_discount(self.discount1),
             desconto2=clean_discount(self.discount2),
             desconto3=clean_discount(self.discount3),
             
             numDiasAgenda="60",
         )
+
+        mora_data = clean_mora(self.mora)
+        if mora_data:
+            data['mora'] = mora_data
 
         multa_data = clean_fine(self.multa)
         if multa_data:
