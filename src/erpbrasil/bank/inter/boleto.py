@@ -92,42 +92,56 @@ class BoletoInter:
             return res
 
         def clean_fine(d):
-             if not d or d.get("codigoMulta") == "NAOTEMMULTA":
-                 return dict(codigo="NAOTEMMULTA")
-             
-             res = {"codigo": d["codigoMulta"]}
-             if d.get("data"): 
-                 res["data"] = d["data"]
-                 
-             if d["codigoMulta"] == "PERCENTUAL":
-                 res["taxa"] = d.get("taxa", 0)
-             elif d["codigoMulta"] == "VALORFIXO":
-                 res["valor"] = d.get("valor", 0)
+            if not d:
+                return None
+            code = d.get("codigoMulta") or d.get("codigo") or "NAOTEMMULTA"
+            if code in ("NAOTEMMULTA", "ISENTO", "NAO_TEM_MULTA"):
+                return None
+            
+            taxa = float(d.get("taxa") or 0.0)
+            valor = float(d.get("valor") or 0.0)
+            if code == "PERCENTUAL" and taxa <= 0:
+                return None
+            if code == "VALORFIXO" and valor <= 0:
+                return None
 
-             if "taxa" not in res and d.get("taxa"):
-                 res["taxa"] = d["taxa"]
-             if "valor" not in res and d.get("valor"):
-                 res["valor"] = d["valor"]
-             return res
+            res = {"codigo": code}
+            if d.get("data"): 
+                res["data"] = d["data"]
+                
+            if code == "PERCENTUAL":
+                res["taxa"] = taxa
+                res["valor"] = 0.0
+            elif code == "VALORFIXO":
+                res["valor"] = valor
+                res["taxa"] = 0.0
+            return res
 
         def clean_mora(d):
-             if not d or d.get("codigoMora") == "ISENTO":
-                 return dict(codigo="ISENTO")
-             
-             res = {"codigo": d["codigoMora"]}
-             if d.get("data"): 
-                 res["data"] = d["data"]
-                 
-             if d["codigoMora"] == "TAXAMENSAL":
-                 res["taxa"] = d.get("taxa", 0)
-             elif d["codigoMora"] == "VALORDIA":
-                 res["valor"] = d.get("valor", 0)
+            if not d:
+                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+            code = d.get("codigoMora") or d.get("codigo") or "ISENTO"
+            if code == "ISENTO":
+                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+            
+            taxa = float(d.get("taxa") or 0.0)
+            valor = float(d.get("valor") or 0.0)
+            if code == "TAXAMENSAL" and taxa <= 0:
+                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
+            if code == "VALORDIA" and valor <= 0:
+                return dict(codigo="ISENTO", taxa=0.0, valor=0.0)
 
-             if "taxa" not in res and d.get("taxa"):
-                 res["taxa"] = d["taxa"]
-             if "valor" not in res and d.get("valor"):
-                 res["valor"] = d["valor"]
-             return res
+            res = {"codigo": code}
+            if d.get("data"): 
+                res["data"] = d["data"]
+                
+            if code == "TAXAMENSAL":
+                res["taxa"] = taxa
+                res["valor"] = 0.0
+            elif code == "VALORDIA":
+                res["valor"] = valor
+                res["taxa"] = 0.0
+            return res
 
         data = dict(
             pagador=pagador,
@@ -137,7 +151,6 @@ class BoletoInter:
             valorNominal=self._amount,
             valorAbatimento=0,
             
-            multa=clean_fine(self.multa),
             mora=clean_mora(self.mora),
             desconto1=clean_discount(self.discount1),
             desconto2=clean_discount(self.discount2),
@@ -145,6 +158,10 @@ class BoletoInter:
             
             numDiasAgenda="60",
         )
+
+        multa_data = clean_fine(self.multa)
+        if multa_data:
+            data['multa'] = multa_data
 
         if self._instructions:
             data["mensagem"] = dict(
